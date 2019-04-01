@@ -18,7 +18,7 @@
 int main() {
   using namespace std::chrono_literals;
 
-  cpu_frequency cpu_freq_mon(1000);
+  CpuFrequency cpu_freq_mon(1000);
   cpu_freq_mon.start_threads(std::thread::hardware_concurrency());
   while(true) {
     cpu_freq_mon.sample();

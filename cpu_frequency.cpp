@@ -146,18 +146,18 @@ float measure_frequency(int attempts, int spin_count) {
 
 } // namespace
 
-void cpu_frequency::start_threads(int num_threads) {
+void CpuFrequency::start_threads(int num_threads) {
   thread_count_ = num_threads;
   thread_data_.resize(num_threads);
   threads_.reserve(num_threads);
   for(int i = 0; i < num_threads; ++i) {
     threads_.emplace_back(
-        &cpu_frequency::sample_thread, this, &thread_data_[i]);
+        &CpuFrequency::sample_thread, this, &thread_data_[i]);
     configure_thread(threads_.back().native_handle(), i);
   }
 }
 
-void cpu_frequency::stop_threads() {
+void CpuFrequency::stop_threads() {
   cancel_ = true;
   sample();
   for(auto&& t : threads_) {
@@ -165,14 +165,14 @@ void cpu_frequency::stop_threads() {
   }
 }
 
-void cpu_frequency::sample() {
+void CpuFrequency::sample() {
   start_work_.notify(thread_count_);
   for(auto i = thread_count_; i > 0; --i) {
     work_complete_.wait();
   }
 }
 
-void cpu_frequency::sample_thread(thread_data* data) {
+void CpuFrequency::sample_thread(thread_data* data) {
   while(!cancel_) {
     start_work_.wait();
     data->mhz = measure_frequency(5, spin_count_);

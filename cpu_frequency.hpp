@@ -21,7 +21,7 @@
 #include <thread>
 #include <vector>
 
-class semaphore {
+class Semaphore {
  public:
   void notify() {
     std::lock_guard<decltype(mutex_)> lock(mutex_);
@@ -49,14 +49,14 @@ class semaphore {
   unsigned long count_ = 0; // Initialized as locked.
 };
 
-class cpu_frequency {
+class CpuFrequency {
  public:
-  cpu_frequency(int spin_count)
+  CpuFrequency(int spin_count)
       : spin_count_(spin_count) {
   }
 
-  cpu_frequency(cpu_frequency const&) = delete;
-  cpu_frequency& operator=(cpu_frequency const&) = delete;
+  CpuFrequency(CpuFrequency const&) = delete;
+  CpuFrequency& operator=(CpuFrequency const&) = delete;
 
   void start_threads(int num_threads);
   void stop_threads();
@@ -74,13 +74,14 @@ class cpu_frequency {
   struct thread_data {
     float mhz;
   };
+  
   void sample_thread(thread_data* data);
 
   std::vector<std::thread> threads_;
   std::vector<thread_data> thread_data_;
   std::atomic<bool> cancel_{false};
-  semaphore start_work_;
-  semaphore work_complete_;
+  Semaphore start_work_;
+  Semaphore work_complete_;
   int spin_count_            = 0;
   unsigned int thread_count_ = 0;
 };
