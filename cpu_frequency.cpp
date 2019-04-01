@@ -27,23 +27,23 @@ extern "C" int execute_exact_clocks(int spin_count);
 namespace {
 
 #ifdef _WIN32
-// class HighResolutionTimer {
-// public:
-//  HighResolutionTimer() noexcept {
-//    QueryPerformanceCounter(&start_);
-//  }
-//  double ElapsedSeconds() const noexcept {
-//    LARGE_INTEGER stop;
-//    QueryPerformanceCounter(&stop);
-//    LARGE_INTEGER frequency;
-//    QueryPerformanceFrequency(&frequency);
-//    return (stop.QuadPart - start_.QuadPart) /
-//           static_cast<double>(frequency.QuadPart);
-//  }
-//
-// private:
-//  LARGE_INTEGER start_;
-//};
+class HighResolutionTimer {
+public:
+ HighResolutionTimer() noexcept {
+   QueryPerformanceCounter(&start_);
+ }
+ double ElapsedSeconds() const noexcept {
+   LARGE_INTEGER stop;
+   QueryPerformanceCounter(&stop);
+   LARGE_INTEGER frequency;
+   QueryPerformanceFrequency(&frequency);
+   return (stop.QuadPart - start_.QuadPart) /
+          static_cast<double>(frequency.QuadPart);
+ }
+
+private:
+ LARGE_INTEGER start_;
+};
 
 void set_thread_affinity(HANDLE handle, int core) {
   SetThreadAffinityMask(handle, 1LL << core);
@@ -87,20 +87,6 @@ void set_thread_priority_max(pthread_t handle) {
 }
 
 #endif // _WIN32
-
-class HighResolutionTimer {
- public:
-  double ElapsedSeconds() const noexcept {
-    using namespace std::chrono;
-    auto end = clock::now();
-    return duration_cast<microseconds>(end - start_).count() / 1e6;
-  }
-
- private:
-  using clock = std::chrono::system_clock;
-
-  std::chrono::time_point<clock> start_ = clock::now();
-};
 
 // Calculate the frequency of the current CPU in MHz, one time.
 float measure_frequency_once(int spin_count) {
