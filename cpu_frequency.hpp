@@ -1,4 +1,4 @@
-// Copyright (c) 2018 Google Inc.
+// Copyright (c) 2019 Google Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -58,7 +58,7 @@ class CpuFrequency {
   CpuFrequency(CpuFrequency const&) = delete;
   CpuFrequency& operator=(CpuFrequency const&) = delete;
 
-  void start_threads(int num_threads);
+  void start_threads(int num_monitor_threads, int num_worker_threads);
   void stop_threads();
   void sample();
 
@@ -76,6 +76,7 @@ class CpuFrequency {
   };
   
   void sample_thread(thread_data* data);
+  std::size_t busy_thread();
 
   std::vector<std::thread> threads_;
   std::vector<thread_data> thread_data_;

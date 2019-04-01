@@ -1,4 +1,4 @@
-// Copyright (c) 2018 Google Inc.
+// Copyright (c) 2019 Google Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 #include "cpu_frequency.hpp"
+
 #include <cassert>
 #include <chrono>
 #include <ratio>
@@ -28,21 +29,21 @@ namespace {
 
 #ifdef _WIN32
 class HighResolutionTimer {
-public:
- HighResolutionTimer() noexcept {
-   QueryPerformanceCounter(&start_);
- }
- double ElapsedSeconds() const noexcept {
-   LARGE_INTEGER stop;
-   QueryPerformanceCounter(&stop);
-   LARGE_INTEGER frequency;
-   QueryPerformanceFrequency(&frequency);
-   return (stop.QuadPart - start_.QuadPart) /
-          static_cast<double>(frequency.QuadPart);
- }
+ public:
+  HighResolutionTimer() noexcept {
+    QueryPerformanceCounter(&start_);
+  }
+  double ElapsedSeconds() const noexcept {
+    LARGE_INTEGER stop;
+    QueryPerformanceCounter(&stop);
+    LARGE_INTEGER frequency;
+    QueryPerformanceFrequency(&frequency);
+    return (stop.QuadPart - start_.QuadPart) /
+           static_cast<double>(frequency.QuadPart);
+  }
 
-private:
- LARGE_INTEGER start_;
+ private:
+  LARGE_INTEGER start_;
 };
 
 void set_thread_affinity(HANDLE handle, int core) {
@@ -102,13 +103,13 @@ float measure_frequency_once(int spin_count) {
   assert(elapsed > 0);
 
   // Calculate the frequency in MHz.
-  int clocks = kClocksPerSpin * spin_count;
+  int clocks           = kClocksPerSpin * spin_count;
   auto const frequency = (clocks / elapsed) / 1e6;
   return static_cast<float>(frequency);
 }
 
 template <typename Handle>
-void configure_thread(Handle h, int index) {
+void configure_monitor_thread(Handle h, int index) {
 #ifdef _WIN32
   HANDLE handle = reinterpret_cast<HANDLE>(h);
 #else
@@ -116,6 +117,16 @@ void configure_thread(Handle h, int index) {
 #endif
   set_thread_affinity(handle, 1LL << index);
   set_thread_priority_max(handle);
+}
+
+template <typename Handle>
+void configure_busy_thread(Handle h, int index) {
+#ifdef _WIN32
+  HANDLE handle = reinterpret_cast<HANDLE>(h);
+#else
+  auto handle = h;
+#endif
+  set_thread_affinity(handle, 1LL << index);
 }
 
 float measure_frequency(int attempts, int spin_count) {
@@ -132,14 +143,19 @@ float measure_frequency(int attempts, int spin_count) {
 
 } // namespace
 
-void CpuFrequency::start_threads(int num_threads) {
-  thread_count_ = num_threads;
-  thread_data_.resize(num_threads);
-  threads_.reserve(num_threads);
-  for(int i = 0; i < num_threads; ++i) {
-    threads_.emplace_back(
-        &CpuFrequency::sample_thread, this, &thread_data_[i]);
-    configure_thread(threads_.back().native_handle(), i);
+void CpuFrequency::start_threads(
+    int num_monitor_threads, int num_worker_threads) {
+  thread_count_ = num_monitor_threads;
+  thread_data_.resize(num_monitor_threads);
+  threads_.reserve(thread_count_);
+  for(int i = 0; i < num_monitor_threads; ++i) {
+    threads_.emplace_back(&CpuFrequency::sample_thread, this, &thread_data_[i]);
+    configure_monitor_thread(threads_.back().native_handle(), i);
+  }
+
+  for(int i = 0; i < num_worker_threads; ++i) {
+    threads_.emplace_back(&CpuFrequency::busy_thread, this);
+    configure_busy_thread(threads_.back().native_handle(), i);
   }
 }
 
@@ -164,4 +180,12 @@ void CpuFrequency::sample_thread(thread_data* data) {
     data->mhz = measure_frequency(5, spin_count_);
     work_complete_.notify();
   }
+}
+
+std::size_t CpuFrequency::busy_thread() {
+  std::size_t i = 0;
+  while(!cancel_) {
+    ++i;
+  }
+  return i;
 }
