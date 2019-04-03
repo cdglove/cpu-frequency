@@ -33,7 +33,8 @@ class HighResolutionTimer {
   HighResolutionTimer() noexcept {
     QueryPerformanceCounter(&start_);
   }
-  double ElapsedSeconds() const noexcept {
+
+  double elapsed_seconds() const noexcept {
     LARGE_INTEGER stop;
     QueryPerformanceCounter(&stop);
     LARGE_INTEGER frequency;
@@ -58,16 +59,34 @@ void set_thread_priority_max(HANDLE handle) {
 
 class HighResolutionTimer {
  public:
-  double ElapsedSeconds() const noexcept {
-    using namespace std::chrono;
-    auto end = clock::now();
-    return duration_cast<microseconds>(end - start_).count() / 1e6;
+  HighResolutionTimer() {
+    clock_gettime(CLOCK_MONOTONIC_RAW, &start_);
+  }
+
+  double elapsed_seconds() const noexcept {
+    timespec end;
+    clock_gettime(CLOCK_MONOTONIC_RAW, &end);
+    auto timer = diff(start_, end);
+    double ret = timer.tv_sec;
+    ret += timer.tv_nsec / 1e9;
+    return ret;
   }
 
  private:
-  using clock = std::chrono::high_resolution_clock;
+  static timespec diff(timespec start, timespec end) {
+    timespec temp;
+    if((end.tv_nsec - start.tv_nsec) < 0) {
+      temp.tv_sec  = end.tv_sec - start.tv_sec - 1;
+      temp.tv_nsec = 1000000000 + end.tv_nsec - start.tv_nsec;
+    }
+    else {
+      temp.tv_sec  = end.tv_sec - start.tv_sec;
+      temp.tv_nsec = end.tv_nsec - start.tv_nsec;
+    }
+    return temp;
+  }
 
-  std::chrono::time_point<clock> start_ = clock::now();
+  timespec start_;
 };
 
 void set_thread_affinity(pthread_t handle, int core) {
@@ -99,7 +118,7 @@ float measure_frequency_once(int spin_count) {
   // be fast enough to usually avoid any interrupts.
   HighResolutionTimer t;
   execute_exact_clocks(spin_count);
-  double const elapsed = t.ElapsedSeconds();
+  double const elapsed = t.elapsed_seconds();
   assert(elapsed > 0);
 
   // Calculate the frequency in MHz.
@@ -185,7 +204,14 @@ void CpuFrequency::sample_thread(thread_data* data) {
 std::size_t CpuFrequency::busy_thread() {
   std::size_t i = 0;
   while(!cancel_) {
-    ++i;
+    HighResolutionTimer t;
+    while(!cancel_) {
+      ++i;
+      if(t.elapsed_seconds() > 0.5) {
+        break;
+      }
+    }
+    sched_yield();
   }
   return i;
 }

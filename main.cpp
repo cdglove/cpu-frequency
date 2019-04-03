@@ -27,22 +27,23 @@ struct Options {
   Mode mode      = Monitor;
   int threads    = std::thread::hardware_concurrency();
   bool want_help = false;
+  int samples    = 1000;
 };
 
 void print_usage() {
   // clang-format off
   std::cout << "  Usage: \n"
-               "  --mode (monitor, instrument)\n"
-               "    Selects the mode to run in. Possible values are:\n"
-               "      monitor    In this mode, the application passively monitors the speed\n"
-               "                 of all cores without affecting the speed of the cpu (much)\n"
+               "    --mode (monitor, instrument)\n"
+               "      Selects the mode to run in. Possible values are:\n"
+               "        monitor    In this mode, the application passively monitors the speed\n"
+               "                   of all cores without affecting the speed of the cpu (much)\n"
                "  \n"
-               "      instrument In this mode, the application spins the cpus up to max in order\n"
-               "                 measure their max capability.\n"
+               "        instrument In this mode, the application spins the cpus up to max in order\n"
+               "                   measure their max capability.\n"
                "  \n"
-               "  --threads int\n"
-               "    Sets the number of threads to use. Leave blank to auto select based on detected\n"
-               "    core count."
+               "    --threads int\n"
+               "      Sets the number of threads to use. Leave blank to auto select based on detected\n"
+               "      core count."
                << std::endl;
   //clang-format on
 }
@@ -106,12 +107,14 @@ int main(int argc, char** argv) {
     return 0;
   }
 
-
   CpuFrequency cpu_freq_mon(1000);
+
   if(options.mode == Options::Monitor) {
+    std::cout << "Monitoring CPU frequencies on " << options.threads << " threads." << std::endl;
     cpu_freq_mon.start_threads(options.threads, 0);
   }
   else {
+    std::cout << "Instrumenting CPU frequencies on " << options.threads << " threads." << std::endl;
     cpu_freq_mon.start_threads(options.threads, options.threads);
   }
 

@@ -74,13 +74,13 @@ class CpuFrequency {
   struct thread_data {
     float mhz;
   };
-  
+
   void sample_thread(thread_data* data);
   std::size_t busy_thread();
 
   std::vector<std::thread> threads_;
   std::vector<thread_data> thread_data_;
-  std::atomic<bool> cancel_{false};
+  std::atomic<bool> cancel_ {false};
   Semaphore start_work_;
   Semaphore work_complete_;
   int spin_count_            = 0;
