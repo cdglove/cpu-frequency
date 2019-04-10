@@ -49,8 +49,22 @@ void print_usage() {
 }
 
 Options parse_options(int argc, char** argv) {
-  auto has_another_arg = [argc](int i) {
-    return i < (argc-1);
+  auto has_another_arg = [argc](int i) { return i < (argc - 1); };
+  auto try_read_next_option = [&](int i, auto& value) {
+  if(!has_another_arg(i)) {
+      std::cout << argv[i] << " requires an argument" << std::endl;
+      print_usage();
+      throw std::runtime_error("error parsing arguments.");
+    }
+    ++i;
+    std::stringstream s;
+    s.str(argv[i]);
+    s >> value;
+    if(s.bad()) {
+      std::cout << "failed to parse " << argv[i] << " argument" << std::endl;
+      print_usage();
+      throw std::runtime_error("error parsing arguments.");
+    }
   };
 
   Options options;
@@ -77,20 +91,10 @@ Options parse_options(int argc, char** argv) {
       }
     }
     else if(!std::strcmp(argv[i], "--threads")) {
-      if(!has_another_arg(i)) {
-        std::cout << "--threads requires an argument" << std::endl;
-        print_usage();
-        throw std::runtime_error("error parsing arguments.");
-      }
-      ++i;
-      std::stringstream s;
-      s.str(argv[i]);
-      s >> options.threads;
-      if(s.bad()) {
-                std::cout << "failed to parse threads argument" << std::endl;
-        print_usage();
-        throw std::runtime_error("error parsing arguments.");
-      }
+      try_read_next_option(i, options.threads);
+    }
+    else if(!std::strcmp(argv[i], "--samples")) {
+      try_read_next_option(i, options.samples);
     }
     else if(!std::strcmp(argv[i], "--help")) {
       options.want_help = true;
@@ -107,25 +111,31 @@ int main(int argc, char** argv) {
     return 0;
   }
 
-  CpuFrequency cpu_freq_mon(1000);
+  CpuFrequency cpu_freq_mon(options.samples);
 
   if(options.mode == Options::Monitor) {
     std::cout << "Monitoring CPU frequencies on " << options.threads << " threads." << std::endl;
-    cpu_freq_mon.start_threads(options.threads, 0);
+    cpu_freq_mon.start_threads(options.threads);
   }
   else {
     std::cout << "Instrumenting CPU frequencies on " << options.threads << " threads." << std::endl;
-    cpu_freq_mon.start_threads(options.threads, options.threads);
+    cpu_freq_mon.start_threads(options.threads);
   }
 
+  using namespace std::chrono_literals;
   while(true) {
+    auto start = std::chrono::steady_clock::now();
     cpu_freq_mon.sample();
     std::cout << std::fixed << std::setprecision(2) << std::setw(10);
     for(int i = 0; i < cpu_freq_mon.thread_count(); ++i) {
       std::cout << cpu_freq_mon.mhz(i) << "  ";
     }
     std::cout << std::endl;
-    std::this_thread::sleep_for(std::chrono::seconds(1));
+    auto end = std::chrono::steady_clock::now();
+    auto sleep_time = 1000ms - std::chrono::duration_cast<std::chrono::milliseconds>(end-start);
+    if(sleep_time > 10ms) {
+      std::this_thread::sleep_for(sleep_time);
+    }
   }
   cpu_freq_mon.stop_threads();
   return 0;

@@ -16,6 +16,7 @@
 #include <cassert>
 #include <chrono>
 #include <ratio>
+#include <sstream>
 
 #ifdef _WIN32
 #  include <Windows.h>
@@ -91,19 +92,23 @@ class HighResolutionTimer {
 
 void set_thread_affinity(pthread_t handle, int core) {
   cpu_set_t cpuset;
-  pthread_t thread;
-  thread = pthread_self();
   CPU_ZERO(&cpuset);
   CPU_SET(core, &cpuset);
-  pthread_setaffinity_np(handle, sizeof(cpu_set_t), &cpuset);
+  auto error = pthread_setaffinity_np(handle, sizeof(cpu_set_t), &cpuset);
+  if(error != 0) {
+    std::stringstream s;
+    s << "Error calling pthread_setaffinity_np: " << error;
+    throw std::runtime_error(s.str());
+  }
 }
 
 void set_thread_priority_max(pthread_t handle) {
-  sched_param param;
-  int policy;
-  pthread_getschedparam(handle, &policy, &param);
-  param.sched_priority = -10;
-  pthread_setschedparam(handle, policy, &param);
+  // auto error = pthread_setschedprio(handle, 0);
+  // if(error != 0) {
+  //   std::stringstream s;
+  //   s << "Error calling pthread_setschedprio: " << error;
+  //   throw std::runtime_error(s.str());
+  // }
 }
 
 #endif // _WIN32
@@ -134,7 +139,7 @@ void configure_monitor_thread(Handle h, int index) {
 #else
   auto handle = h;
 #endif
-  set_thread_affinity(handle, 1LL << index);
+  set_thread_affinity(handle, index);
   set_thread_priority_max(handle);
 }
 
@@ -145,12 +150,12 @@ void configure_busy_thread(Handle h, int index) {
 #else
   auto handle = h;
 #endif
-  set_thread_affinity(handle, 1LL << index);
+  set_thread_affinity(handle, index);
 }
 
 float measure_frequency(int attempts, int spin_count) {
-  float max_frequency = 0.f;
-  for(int i = 0; i < attempts; ++i) {
+  float max_frequency = measure_frequency_once(spin_count);
+  for(int i = 1; i < attempts; ++i) {
     float frequency = measure_frequency_once(spin_count);
     if(frequency > max_frequency) {
       max_frequency = frequency;
@@ -162,19 +167,13 @@ float measure_frequency(int attempts, int spin_count) {
 
 } // namespace
 
-void CpuFrequency::start_threads(
-    int num_monitor_threads, int num_worker_threads) {
+void CpuFrequency::start_threads(int num_monitor_threads) {
   thread_count_ = num_monitor_threads;
   thread_data_.resize(num_monitor_threads);
   threads_.reserve(thread_count_);
   for(int i = 0; i < num_monitor_threads; ++i) {
     threads_.emplace_back(&CpuFrequency::sample_thread, this, &thread_data_[i]);
     configure_monitor_thread(threads_.back().native_handle(), i);
-  }
-
-  for(int i = 0; i < num_worker_threads; ++i) {
-    threads_.emplace_back(&CpuFrequency::busy_thread, this);
-    configure_busy_thread(threads_.back().native_handle(), i);
   }
 }
 
@@ -186,7 +185,10 @@ void CpuFrequency::stop_threads() {
   }
 }
 
+#include <iostream>
+
 void CpuFrequency::sample() {
+  std::fill(thread_data_.begin(), thread_data_.end(), thread_data());
   start_work_.notify(thread_count_);
   for(auto i = thread_count_; i > 0; --i) {
     work_complete_.wait();
@@ -199,19 +201,4 @@ void CpuFrequency::sample_thread(thread_data* data) {
     data->mhz = measure_frequency(5, spin_count_);
     work_complete_.notify();
   }
-}
-
-std::size_t CpuFrequency::busy_thread() {
-  std::size_t i = 0;
-  while(!cancel_) {
-    HighResolutionTimer t;
-    while(!cancel_) {
-      ++i;
-      if(t.elapsed_seconds() > 0.5) {
-        break;
-      }
-    }
-    sched_yield();
-  }
-  return i;
 }
