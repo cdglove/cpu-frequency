@@ -75,7 +75,7 @@ HANDLE get_current_thread_handle() {
 }
 
 int get_current_thread_core() {
-  return GetCurrentThread();
+  return GetCurrentProcessorNumber();
 }
 
 #else
