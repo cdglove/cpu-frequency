@@ -132,12 +132,6 @@ int main(int argc, char** argv) {
     }
 
     std::cout << std::endl;
-
-    for(int i = 0; i < cpu_freq_mon.thread_count(); ++i) {
-      std::cout << cpu_freq_mon.id(i) << "  ";
-    }
-
-    std::cout << std::endl;
     auto end = std::chrono::steady_clock::now();
     auto sleep_time = 1000ms - std::chrono::duration_cast<std::chrono::milliseconds>(end-start);
     if(sleep_time > 10ms) {

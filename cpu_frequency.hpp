@@ -70,14 +70,9 @@ class CpuFrequency {
     return thread_data_[i].mhz;
   }
 
-  int id(int i) {
-    return thread_data_[i].id;
-  }
-
  private:
   struct thread_data {
     float mhz = 0;
-    int id = 0;
   };
 
   void sample_thread(thread_data* data);

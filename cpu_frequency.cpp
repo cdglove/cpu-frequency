@@ -70,6 +70,14 @@ void set_thread_priority_max(HANDLE handle) {
   }
 }
 
+HANDLE get_current_thread_handle() {
+  return GetCurrentThread();
+}
+
+int get_current_thread_core() {
+  return GetCurrentThread();
+}
+
 #else
 
 class HighResolutionTimer {
@@ -119,12 +127,20 @@ void set_thread_affinity(pthread_t handle, int core) {
 void set_thread_priority_max(pthread_t handle) {
   sched_param params;
   params.sched_priority = sched_get_priority_max(SCHED_OTHER);
-  auto error = pthread_setschedparam(handle, SCHED_OTHER, &params);
+  auto error            = pthread_setschedparam(handle, SCHED_OTHER, &params);
   if(error != 0) {
     std::stringstream s;
     s << "Error calling pthread_setschedparam: " << error;
     throw std::runtime_error(s.str());
   }
+}
+
+int get_current_thread_core() {
+  return sched_getcpu();
+}
+
+pthread_t get_current_thread_handle() {
+  return pthread_self();
 }
 
 #endif // _WIN32
@@ -149,11 +165,7 @@ float measure_frequency_once(int spin_count) {
 }
 
 void configure_monitor_thread(int index) {
-#ifdef _WIN32
-  HANDLE handle = GetCurrentThread();
-#else
-  auto handle = pthread_self();
-#endif
+  auto handle = get_current_thread_handle();
   set_thread_affinity(handle, index);
   set_thread_priority_max(handle);
 }
@@ -189,8 +201,6 @@ void CpuFrequency::stop_threads() {
   }
 }
 
-#include <iostream>
-
 void CpuFrequency::sample() {
   std::fill(thread_data_.begin(), thread_data_.end(), thread_data());
   start_work_.notify(thread_count_);
@@ -200,11 +210,18 @@ void CpuFrequency::sample() {
 }
 
 void CpuFrequency::sample_thread(thread_data* data) {
-  configure_monitor_thread(data - thread_data_.data());
+  auto thread_index = data - thread_data_.data();
+  configure_monitor_thread(thread_index);
   while(!cancel_) {
     start_work_.wait();
     data->mhz = measure_frequency(5, spin_count_);
-    data->id  = sched_getcpu();
     work_complete_.notify();
+    auto current_core = get_current_thread_core();
+    if(thread_index != current_core) {
+      std::stringstream s;
+      s << "Error: thread " << thread_index << " running on core "
+        << current_core;
+      throw std::runtime_error(s.str());
+    }
   }
 }
