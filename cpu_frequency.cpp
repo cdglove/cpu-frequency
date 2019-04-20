@@ -49,11 +49,25 @@ class HighResolutionTimer {
 };
 
 void set_thread_affinity(HANDLE handle, int core) {
-  SetThreadAffinityMask(handle, 1LL << core);
+  auto result = SetThreadAffinityMask(handle, 1LL << core);
+  if(result == 0) {
+    auto last = GetLastError();
+    std::stringstream s;
+    s << "Error calling SetThreadAffinityMask: " << result
+      << ", GetLastError: " << last;
+    throw std::runtime_error(s.str());
+  }
 }
 
 void set_thread_priority_max(HANDLE handle) {
-  SetThreadPriority(handle, THREAD_PRIORITY_HIGHEST);
+  auto result = SetThreadPriority(handle, THREAD_PRIORITY_HIGHEST);
+  if(result == 0) {
+    auto last = GetLastError();
+    std::stringstream s;
+    s << "Error calling SetThreadPriority: " << result
+      << ", GetLastError: " << last;
+    throw std::runtime_error(s.str());
+  }
 }
 
 #else
@@ -103,12 +117,14 @@ void set_thread_affinity(pthread_t handle, int core) {
 }
 
 void set_thread_priority_max(pthread_t handle) {
-  // auto error = pthread_setschedprio(handle, 0);
-  // if(error != 0) {
-  //   std::stringstream s;
-  //   s << "Error calling pthread_setschedprio: " << error;
-  //   throw std::runtime_error(s.str());
-  // }
+  sched_param params;
+  params.sched_priority = sched_get_priority_max(SCHED_OTHER);
+  auto error = pthread_setschedparam(handle, SCHED_OTHER, &params);
+  if(error != 0) {
+    std::stringstream s;
+    s << "Error calling pthread_setschedparam: " << error;
+    throw std::runtime_error(s.str());
+  }
 }
 
 #endif // _WIN32
@@ -132,25 +148,14 @@ float measure_frequency_once(int spin_count) {
   return static_cast<float>(frequency);
 }
 
-template <typename Handle>
-void configure_monitor_thread(Handle h, int index) {
+void configure_monitor_thread(int index) {
 #ifdef _WIN32
-  HANDLE handle = reinterpret_cast<HANDLE>(h);
+  HANDLE handle = GetCurrentThread();
 #else
-  auto handle = h;
+  auto handle = pthread_self();
 #endif
   set_thread_affinity(handle, index);
   set_thread_priority_max(handle);
-}
-
-template <typename Handle>
-void configure_busy_thread(Handle h, int index) {
-#ifdef _WIN32
-  HANDLE handle = reinterpret_cast<HANDLE>(h);
-#else
-  auto handle = h;
-#endif
-  set_thread_affinity(handle, index);
 }
 
 float measure_frequency(int attempts, int spin_count) {
@@ -173,7 +178,6 @@ void CpuFrequency::start_threads(int num_monitor_threads) {
   threads_.reserve(thread_count_);
   for(int i = 0; i < num_monitor_threads; ++i) {
     threads_.emplace_back(&CpuFrequency::sample_thread, this, &thread_data_[i]);
-    configure_monitor_thread(threads_.back().native_handle(), i);
   }
 }
 
@@ -196,9 +200,11 @@ void CpuFrequency::sample() {
 }
 
 void CpuFrequency::sample_thread(thread_data* data) {
+  configure_monitor_thread(data - thread_data_.data());
   while(!cancel_) {
     start_work_.wait();
     data->mhz = measure_frequency(5, spin_count_);
+    data->id  = sched_getcpu();
     work_complete_.notify();
   }
 }
