@@ -21,6 +21,8 @@
 #include <thread>
 #include <vector>
 
+namespace cpuhz {
+
 class Semaphore {
  public:
   void notify() {
@@ -57,14 +59,14 @@ class Semaphore {
   unsigned long count_ = 0; // Initialized as locked.
 };
 
-class CpuFrequency {
+class Sampler {
  public:
-  CpuFrequency(int spin_count)
+  Sampler(int spin_count)
       : spin_count_(spin_count) {
   }
 
-  CpuFrequency(CpuFrequency const&) = delete;
-  CpuFrequency& operator=(CpuFrequency const&) = delete;
+  Sampler(Sampler const&) = delete;
+  Sampler& operator=(Sampler const&) = delete;
 
   void start_threads(int num_monitor_threads);
   void stop_threads();
@@ -87,11 +89,13 @@ class CpuFrequency {
 
   std::vector<std::thread> threads_;
   std::vector<thread_data> thread_data_;
-  std::atomic<bool> cancel_ {false};
+  std::atomic<bool> cancel_{false};
   Semaphore start_work_;
   Semaphore work_complete_;
   Semaphore end_work_;
   int spin_count_            = 0;
   unsigned int thread_count_ = 0;
 };
+
+} // namespace cpuhz
 #endif // CPUFREQUENCY_HPP

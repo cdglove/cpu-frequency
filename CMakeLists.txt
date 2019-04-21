@@ -16,8 +16,7 @@ cmake_minimum_required(VERSION 3.12)
 project(cpu-frequency C CXX)
 
 set(PROJECT_SOURCES
-  main.cpp
-  cpu_frequency.cpp
+  src/sampler.cpp
 )
 
 if("${CMAKE_SIZEOF_VOID_P}" STREQUAL "4")
@@ -34,15 +33,19 @@ endif()
 
 if(MSVC)
   enable_language(ASM_MASM)
-  set(PROJECT_SOURCES ${PROJECT_SOURCES} masm/${execute_exact_clocks}.asm)
+  set(PROJECT_SOURCES ${PROJECT_SOURCES} src/masm/${execute_exact_clocks}.asm)
   set(PROJECT_LIBRARIES "")
 else()
   enable_language(ASM_NASM)
-  set(PROJECT_SOURCES ${PROJECT_SOURCES} nasm/${PROJECT_PLATFORM_DIR}/${execute_exact_clocks}.asm)
+  set(PROJECT_SOURCES ${PROJECT_SOURCES} src/nasm/${PROJECT_PLATFORM_DIR}/${execute_exact_clocks}.asm)
   set(PROJECT_LIBRARIES pthread)
 endif()
 
-file(GLOB_RECURSE PROJECT_HEADERS src/*.hpp)
+file(GLOB_RECURSE PROJECT_HEADERS include/cpuhz/*.hpp src/*.hpp)
 
-add_executable(cpu-frequency ${PROJECT_SOURCES} ${PROJECT_HEADERS})
-target_link_libraries(cpu-frequency PUBLIC ${PROJECT_LIBRARIES})
+add_library(cpuhz ${PROJECT_SOURCES} ${PROJECT_HEADERS})
+target_link_libraries(cpuhz PUBLIC ${PROJECT_LIBRARIES})
+target_include_directories(cpuhz PUBLIC include)
+
+add_executable(cpu-frequency src/main.cpp)
+target_link_libraries(cpu-frequency PUBLIC cpuhz)

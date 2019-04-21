@@ -11,7 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-#include "cpu_frequency.hpp"
+#include "cpuhz/sampler.hpp"
 #include <cstring>
 #include <iomanip>
 #include <iostream>
@@ -139,7 +139,7 @@ int main(int argc, char** argv) {
     return 0;
   }
 
-  CpuFrequency cpu_freq_mon(options.samples);
+  cpuhz::Sampler cpu_freq_mon(options.samples);
 
   if(options.mode == Options::Monitor) {
     std::cout << "Monitoring CPU frequencies on " << options.threads

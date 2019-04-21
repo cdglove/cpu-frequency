@@ -11,7 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-#include "cpu_frequency.hpp"
+#include "cpuhz/sampler.hpp"
 
 #include <cassert>
 #include <chrono>
@@ -184,16 +184,17 @@ float measure_frequency(int attempts, int spin_count) {
 
 } // namespace
 
-void CpuFrequency::start_threads(int num_monitor_threads) {
+namespace cpuhz {
+void Sampler::start_threads(int num_monitor_threads) {
   thread_count_ = num_monitor_threads;
   thread_data_.resize(num_monitor_threads);
   threads_.reserve(thread_count_);
   for(int i = 0; i < num_monitor_threads; ++i) {
-    threads_.emplace_back(&CpuFrequency::sample_thread, this, &thread_data_[i]);
+    threads_.emplace_back(&Sampler::sample_thread, this, &thread_data_[i]);
   }
 }
 
-void CpuFrequency::stop_threads() {
+void Sampler::stop_threads() {
   cancel_ = true;
   sample();
   for(auto&& t : threads_) {
@@ -201,14 +202,14 @@ void CpuFrequency::stop_threads() {
   }
 }
 
-void CpuFrequency::sample() {
+void Sampler::sample() {
   std::fill(thread_data_.begin(), thread_data_.end(), thread_data());
   start_work_.notify(thread_count_);
   work_complete_.wait(thread_count_);
   end_work_.notify(thread_count_);
 }
 
-void CpuFrequency::sample_thread(thread_data* data) {
+void Sampler::sample_thread(thread_data* data) {
   auto thread_index = data - thread_data_.data();
   configure_monitor_thread(thread_index);
   while(!cancel_) {
@@ -227,3 +228,5 @@ void CpuFrequency::sample_thread(thread_data* data) {
     end_work_.wait();
   }
 }
+
+} // namespace cpuhz
