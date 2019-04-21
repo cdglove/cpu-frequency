@@ -43,6 +43,14 @@ class Semaphore {
     --count_;
   }
 
+  void wait(unsigned int count) {
+    std::unique_lock<decltype(mutex_)> lock(mutex_);
+    while(count_ < count) {
+      condition_.wait(lock);
+    }
+    count_ -= count;
+  }
+
  private:
   std::mutex mutex_;
   std::condition_variable condition_;
@@ -82,6 +90,7 @@ class CpuFrequency {
   std::atomic<bool> cancel_ {false};
   Semaphore start_work_;
   Semaphore work_complete_;
+  Semaphore end_work_;
   int spin_count_            = 0;
   unsigned int thread_count_ = 0;
 };

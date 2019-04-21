@@ -204,9 +204,8 @@ void CpuFrequency::stop_threads() {
 void CpuFrequency::sample() {
   std::fill(thread_data_.begin(), thread_data_.end(), thread_data());
   start_work_.notify(thread_count_);
-  for(auto i = thread_count_; i > 0; --i) {
-    work_complete_.wait();
-  }
+  work_complete_.wait(thread_count_);
+  end_work_.notify(thread_count_);
 }
 
 void CpuFrequency::sample_thread(thread_data* data) {
@@ -215,7 +214,7 @@ void CpuFrequency::sample_thread(thread_data* data) {
   while(!cancel_) {
     start_work_.wait();
     data->mhz = measure_frequency(5, spin_count_);
-    work_complete_.notify();
+
     auto current_core = get_current_thread_core();
     if(thread_index != current_core) {
       std::stringstream s;
@@ -223,5 +222,8 @@ void CpuFrequency::sample_thread(thread_data* data) {
         << current_core;
       throw std::runtime_error(s.str());
     }
+
+    work_complete_.notify();
+    end_work_.wait();
   }
 }
