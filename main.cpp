@@ -45,13 +45,13 @@ void print_usage() {
                "      Sets the number of threads to use. Leave blank to auto select based on detected\n"
                "      core count."
                << std::endl;
-  //clang-format on
+  // clang-format on
 }
 
 Options parse_options(int argc, char** argv) {
-  auto has_another_arg = [argc](int i) { return i < (argc - 1); };
+  auto has_another_arg      = [argc](int i) { return i < (argc - 1); };
   auto try_read_next_option = [&](int i, auto& value) {
-  if(!has_another_arg(i)) {
+    if(!has_another_arg(i)) {
       std::cout << argv[i] << " requires an argument" << std::endl;
       print_usage();
       throw std::runtime_error("error parsing arguments.");
@@ -108,10 +108,9 @@ namespace sc = std::chrono;
 
 class FrequencyTimer {
  public:
-
-  FrequencyTimer(double frequency_hz) 
-    : cycle_(frequency_hz > 0 ? (1/frequency_hz) : 0)
-    , start_(sc::steady_clock::now()) {
+  FrequencyTimer(double frequency_hz)
+      : cycle_(frequency_hz > 0 ? (1 / frequency_hz) : 0)
+      , start_(sc::steady_clock::now()) {
   }
 
   bool expired() const {
@@ -127,15 +126,14 @@ class FrequencyTimer {
     // cglover-todo: this will cause drift;
     start_ = sc::steady_clock::now();
   }
-  
-private:
 
+ private:
   sc::duration<double> cycle_;
   sc::time_point<sc::steady_clock> start_;
 };
 
 int main(int argc, char** argv) {
-  Options options = parse_options(argc, argv);  
+  Options options = parse_options(argc, argv);
   if(options.want_help) {
     print_usage();
     return 0;
@@ -144,16 +142,18 @@ int main(int argc, char** argv) {
   CpuFrequency cpu_freq_mon(options.samples);
 
   if(options.mode == Options::Monitor) {
-    std::cout << "Monitoring CPU frequencies on " << options.threads << " threads." << std::endl;
+    std::cout << "Monitoring CPU frequencies on " << options.threads
+              << " threads." << std::endl;
   }
   else {
-    std::cout << "Instrumenting CPU frequencies on " << options.threads << " threads." << std::endl;
+    std::cout << "Instrumenting CPU frequencies on " << options.threads
+              << " threads." << std::endl;
   }
 
   cpu_freq_mon.start_threads(options.threads);
-  
+
   using namespace std::literals;
-  
+
   FrequencyTimer print_timer(1);
   FrequencyTimer sample_timer(options.mode == Options::Monitor ? 1 : 0);
 
