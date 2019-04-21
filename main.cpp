@@ -104,6 +104,36 @@ Options parse_options(int argc, char** argv) {
   return options;
 }
 
+namespace sc = std::chrono;
+
+class FrequencyTimer {
+ public:
+
+  FrequencyTimer(double frequency_hz) 
+    : cycle_(frequency_hz > 0 ? (1/frequency_hz) : 0)
+    , start_(sc::steady_clock::now()) {
+  }
+
+  bool expired() const {
+    return remaining() <= sc::milliseconds(0);
+  }
+
+  sc::milliseconds remaining() const {
+    auto next = start_ + cycle_;
+    return sc::duration_cast<sc::milliseconds>(next - sc::steady_clock::now());
+  }
+
+  void reset() {
+    // cglover-todo: this will cause drift;
+    start_ = sc::steady_clock::now();
+  }
+  
+private:
+
+  sc::duration<double> cycle_;
+  sc::time_point<sc::steady_clock> start_;
+};
+
 int main(int argc, char** argv) {
   Options options = parse_options(argc, argv);  
   if(options.want_help) {
@@ -115,29 +145,36 @@ int main(int argc, char** argv) {
 
   if(options.mode == Options::Monitor) {
     std::cout << "Monitoring CPU frequencies on " << options.threads << " threads." << std::endl;
-    cpu_freq_mon.start_threads(options.threads);
   }
   else {
     std::cout << "Instrumenting CPU frequencies on " << options.threads << " threads." << std::endl;
-    cpu_freq_mon.start_threads(options.threads);
   }
 
-  using namespace std::chrono_literals;
+  cpu_freq_mon.start_threads(options.threads);
+  
+  using namespace std::literals;
+  
+  FrequencyTimer print_timer(1);
+  FrequencyTimer sample_timer(options.mode == Options::Monitor ? 1 : 0);
+
   while(true) {
-    auto start = std::chrono::steady_clock::now();
     cpu_freq_mon.sample();
-    std::cout << std::fixed << std::setprecision(2) << std::setw(10);
-    for(int i = 0; i < cpu_freq_mon.thread_count(); ++i) {
-      std::cout << cpu_freq_mon.mhz(i) << "  ";
+    if(print_timer.expired()) {
+      print_timer.reset();
+      std::cout << std::fixed << std::setprecision(2) << std::setw(10);
+      for(int i = 0; i < cpu_freq_mon.thread_count(); ++i) {
+        std::cout << cpu_freq_mon.mhz(i) << "  ";
+      }
+      std::cout << std::endl;
     }
 
-    std::cout << std::endl;
-    auto end = std::chrono::steady_clock::now();
-    auto sleep_time = 1000ms - std::chrono::duration_cast<std::chrono::milliseconds>(end-start);
-    if(sleep_time > 10ms) {
-      std::this_thread::sleep_for(sleep_time);
+    auto remaining = sample_timer.remaining();
+    if(remaining > 10ms) {
+      std::this_thread::sleep_for(remaining);
+      sample_timer.reset();
     }
   }
+
   cpu_freq_mon.stop_threads();
   return 0;
 }
