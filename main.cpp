@@ -124,7 +124,7 @@ class FrequencyTimer {
 
   void reset() {
     // cglover-todo: this will cause drift;
-    start_ = sc::steady_clock::now();
+    start_ = sc::time_point_cast<sc::steady_clock::duration>(start_ + cycle_);
   }
 
  private:
@@ -170,8 +170,8 @@ int main(int argc, char** argv) {
 
     auto remaining = sample_timer.remaining();
     if(remaining > 10ms) {
-      std::this_thread::sleep_for(remaining);
       sample_timer.reset();
+      std::this_thread::sleep_for(remaining);
     }
   }
 
