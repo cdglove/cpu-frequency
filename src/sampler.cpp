@@ -210,7 +210,7 @@ void Sampler::sample() {
 }
 
 void Sampler::sample_thread(thread_data* data) {
-  auto thread_index = data - thread_data_.data();
+  auto thread_index = static_cast<int>(data - thread_data_.data());
   configure_monitor_thread(thread_index);
   while(!cancel_) {
     start_work_.wait();
