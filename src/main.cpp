@@ -24,10 +24,10 @@ struct Options {
     Instrument,
   };
 
-  Mode mode      = Monitor;
-  int threads    = std::thread::hardware_concurrency();
+  Mode mode = Monitor;
+  int threads = std::thread::hardware_concurrency();
   bool want_help = false;
-  int samples    = 1000;
+  int samples = 1000;
 };
 
 void print_usage() {
@@ -49,7 +49,7 @@ void print_usage() {
 }
 
 Options parse_options(int argc, char** argv) {
-  auto has_another_arg      = [argc](int i) { return i < (argc - 1); };
+  auto has_another_arg = [argc](int i) { return i < (argc - 1); };
   auto try_read_next_option = [&](int i, auto& value) {
     if(!has_another_arg(i)) {
       std::cout << argv[i] << " requires an argument" << std::endl;
@@ -140,7 +140,6 @@ int main(int argc, char** argv) {
   }
 
   cpuhz::Sampler cpu_freq_mon(options.samples);
-
   if(options.mode == Options::Monitor) {
     std::cout << "Monitoring CPU frequencies on " << options.threads
               << " threads." << std::endl;
@@ -158,19 +157,20 @@ int main(int argc, char** argv) {
   FrequencyTimer sample_timer(options.mode == Options::Monitor ? 1 : 0);
 
   while(true) {
+    sample_timer.reset();
     cpu_freq_mon.sample();
     if(print_timer.expired()) {
       print_timer.reset();
-      std::cout << std::fixed << std::setprecision(2) << std::setw(10);
+      std::cout << std::fixed << std::setprecision(2);
       for(int i = 0; i < cpu_freq_mon.thread_count(); ++i) {
-        std::cout << cpu_freq_mon.mhz(i) << "  ";
+        auto mhz = cpu_freq_mon.mhz(i);
+        std::cout << std::setw(9) << mhz << "  ";
       }
       std::cout << std::endl;
     }
 
     auto remaining = sample_timer.remaining();
     if(remaining > 10ms) {
-      sample_timer.reset();
       std::this_thread::sleep_for(remaining);
     }
   }
