@@ -83,15 +83,16 @@ int get_current_thread_core() {
 class HighResolutionTimer {
  public:
   HighResolutionTimer() {
-    clock_gettime(CLOCK_MONOTONIC_RAW, &start_);
+    clock_gettime(CLOCK_THREAD_CPUTIME_ID, &start_);
   }
 
   double elapsed_seconds() const noexcept {
     timespec end;
-    clock_gettime(CLOCK_MONOTONIC_RAW, &end);
+    clock_gettime(CLOCK_THREAD_CPUTIME_ID, &end);
     auto timer = diff(start_, end);
-    double ret = timer.tv_sec;
-    ret += timer.tv_nsec / 1e9;
+    double ret = timer.tv_nsec;
+    ret /= std::nano::den * 1.0;
+    ret += timer.tv_sec;
     return ret;
   }
 
@@ -100,7 +101,7 @@ class HighResolutionTimer {
     timespec temp;
     if((end.tv_nsec - start.tv_nsec) < 0) {
       temp.tv_sec  = end.tv_sec - start.tv_sec - 1;
-      temp.tv_nsec = 1000000000 + end.tv_nsec - start.tv_nsec;
+      temp.tv_nsec = std::nano::den + end.tv_nsec - start.tv_nsec;
     }
     else {
       temp.tv_sec  = end.tv_sec - start.tv_sec;
@@ -150,10 +151,15 @@ float measure_frequency_once(int spin_count) {
 
   // By construction of execute_exact_clocks.asm
   int const kClocksPerSpin = 50;
+ 
+  // Try to sleep immediately before measuring so we're more likely to 
+  // avoid interruption.
+  std::this_thread::sleep_for(std::chrono::microseconds(1));
+
+  HighResolutionTimer t;
 
   // Spin for kSpinsPerLoop * kSpinCount cycles. This should
   // be fast enough to usually avoid any interrupts.
-  HighResolutionTimer t;
   execute_exact_clocks(spin_count);
   double const elapsed = t.elapsed_seconds();
   assert(elapsed > 0);
@@ -214,7 +220,7 @@ void Sampler::sample_thread(thread_data* data) {
   configure_monitor_thread(thread_index);
   while(!cancel_) {
     start_work_.wait();
-    data->mhz = measure_frequency(5, spin_count_);
+    data->mhz = measure_frequency(25, spin_count_);
 
     auto current_core = get_current_thread_core();
     if(thread_index != current_core) {
