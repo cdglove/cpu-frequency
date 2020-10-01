@@ -19,31 +19,26 @@
 #include <thread>
 
 struct Options {
-  enum Mode {
-    Monitor,
-    Instrument,
-  };
-
-  Mode mode = Monitor;
   int threads = std::thread::hardware_concurrency();
   bool want_help = false;
-  int samples = 1000;
+  int samples = 2500;
 };
 
 void print_usage() {
   // clang-format off
-  std::cout << "  Usage: \n"
-               "    --mode (monitor, instrument)\n"
-               "      Selects the mode to run in. Possible values are:\n"
-               "        monitor    In this mode, the application passively monitors the speed\n"
-               "                   of all cores without affecting the speed of the cpu (much)\n"
-               "  \n"
-               "        instrument In this mode, the application spins the cpus up to max in order\n"
-               "                   measure their max capability.\n"
-               "  \n"
-               "    --threads int\n"
-               "      Sets the number of threads to use. Leave blank to auto select based on detected\n"
-               "      core count."
+  std::cout << " Usage: \n"
+               "   --threads int\n"
+               "       Sets the number of threads to use.\n" 
+               "       Leave blank to auto select based on detected core count.\n"
+               "   --samples int\n"
+               "       Sets the number of samples to take when timing.\n"
+               "       It's imprtant to selct the smallest value possible\n." 
+               "       Larger values are necessary on very fast processors to be long enough to measure,\n"
+               "       but larger values can cause the frequency to increase and are also likely\n"
+               "       to be interrupted by the scheduler, reducing the measured frequency.\n"
+               "       Good values are typically around 1 per CPU MHz, or 1000 per GHz.\n"
+               "       Example: A 2.2Ghz CPU could use a value around 2200.\n"
+               "       The default is 2500."
                << std::endl;
   // clang-format on
 }
@@ -70,27 +65,7 @@ Options parse_options(int argc, char** argv) {
   Options options;
   std::stringstream opt;
   for(int i = 0; i < argc; ++i) {
-    if(!std::strcmp(argv[i], "--mode")) {
-      if(!has_another_arg(i)) {
-        std::cout << "--mode requires an argument" << std::endl;
-        print_usage();
-        throw std::runtime_error("error parsing arguments.");
-      }
-
-      ++i;
-      if(!std::strcmp(argv[i], "monitor")) {
-        options.mode = Options::Monitor;
-      }
-      else if(!std::strcmp(argv[i], "instrument")) {
-        options.mode = Options::Instrument;
-      }
-      else {
-        std::cout << "failed to parse mode argument" << std::endl;
-        print_usage();
-        throw std::runtime_error("error parsing arguments.");
-      }
-    }
-    else if(!std::strcmp(argv[i], "--threads")) {
+    if(!std::strcmp(argv[i], "--threads")) {
       try_read_next_option(i, options.threads);
     }
     else if(!std::strcmp(argv[i], "--samples")) {
@@ -140,24 +115,16 @@ int main(int argc, char** argv) {
   }
 
   cpuhz::Sampler cpu_freq_mon(options.samples);
-  if(options.mode == Options::Monitor) {
-    std::cout << "Monitoring CPU frequencies on " << options.threads
-              << " threads." << std::endl;
-  }
-  else {
-    std::cout << "Instrumenting CPU frequencies on " << options.threads
-              << " threads." << std::endl;
-  }
+  std::cout << "Monitoring CPU frequencies on " << options.threads
+            << " threads." << std::endl;
 
   cpu_freq_mon.start_threads(options.threads);
 
   using namespace std::literals;
 
   FrequencyTimer print_timer(1);
-  FrequencyTimer sample_timer(options.mode == Options::Monitor ? 1 : 0);
 
   while(true) {
-    sample_timer.reset();
     cpu_freq_mon.sample();
     if(print_timer.expired()) {
       print_timer.reset();
@@ -169,7 +136,7 @@ int main(int argc, char** argv) {
       std::cout << std::endl;
     }
 
-    auto remaining = sample_timer.remaining();
+    auto remaining = print_timer.remaining();
     if(remaining > 10ms) {
       std::this_thread::sleep_for(remaining);
     }
