@@ -13,8 +13,10 @@ Ninja - https://github.com/ninja-build/ninja/releases
 Make sure all the above are available on your PATH
 
 ## Building
-Linux: cmake -G Ninja -DCMAKE_TOOLCHAIN_FILE="$GGP_SDK_PATH/cmake/ggp.cmake" .
-Windows: cmake -G Ninja -DCMAKE_TOOLCHAIN_FILE="%GGP_SDK_PATH%/cmake/ggp.cmake" .
+Linux: cmake -G Ninja -DCMAKE_TOOLCHAIN_FILE="$GGP_SDK_PATH/cmake/ggp.cmake".
+
+Windows: cmake -G Ninja -DCMAKE_TOOLCHAIN_FILE="%GGP_SDK_PATH%/cmake/ggp.cmake".
+         cmake -G "Visual Studio 16" -DCMAKE_TOOLCHAIN_FILE="%GGP_SDK_PATH%/cmake/ggp.cmake".
 
 Followed by
 cmake --build .
